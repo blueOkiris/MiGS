@@ -4,6 +4,25 @@
 
 A cheap and easy to program game console based on multiple microcontrollers interacting.
 
+## Building
+
+- Dependencies:
+  + Linux System
+  + gcc
+  + make
+  + git
+  + cmake
+  + gcc-arm-none-eabi
+  + libnewlib-arm-none-eabi
+
+To flash the programmer run `make upload-pgrmr PORT=<insert port>`
+
+To build the menu program run `make MigsMenu.ino.hex`
+
+To build the gpu program run `make MigsGpu.uf2`
+
+To flash the ErrorReceiver program, use the Arduino IDE
+
 ## System Design
 
 3 Parts: Programming MCU, Logic MCU, and Graphics MCU

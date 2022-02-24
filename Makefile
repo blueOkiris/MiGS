@@ -5,7 +5,7 @@
 
 # Settings
 
-## Arduino build System Settings
+## Arduino build system settings
 
 ARD_BASE_URL :=		https://github.com/arduino/arduino-cli/releases/download
 ARD_VERS :=			0.19.3
@@ -18,7 +18,7 @@ ARD_CONF :=			arduino-cli.yaml
 
 LIBS :=				SD
 
-## Arduino project specific libraries
+## Arduino programmer project specific settings
 
 PGRMR_PROJNAME :=	MigsProgrammer
 PGRMR_BOARD_FQBN :=	arduino:avr:uno
@@ -28,6 +28,8 @@ PGRMR_SRC :=		$(PGRMR_PROJNAME)/$(PGRMR_PROJNAME).ino \
 					$(wildcard $(PGRMR_PROJNAME)/*.hpp)
 PGRMR_OBJNAME :=	$(PGRMR_PROJNAME).ino.hex
 
+## Arduino menu program specific settings
+
 MENU_PROJNAME :=	MigsMenu
 MENU_BOARD_FQBN :=	arduino:avr:uno
 MENU_BUILD_PATH :=	build/$(MENU_PROJNAME)
@@ -35,6 +37,14 @@ MENU_SRC :=			$(MENU_PROJNAME)/$(MENU_PROJNAME).ino \
 					$(wildcard $(MENU_PROJNAME)/*.cpp) \
 					$(wildcard $(MENU_PROJNAME)/*.hpp)
 MENU_OBJNAME :=		$(MENU_PROJNAME).ino.hex
+
+## GPU project settings
+
+GPU_OBJNAME :=		MigsGpu
+GPU_SRC :=			$(wildcard $(GPU_OBJNAME)/src/*.cpp)
+GPU_HFILES :=		$(wildcard $(GPU_OBJNAME)/include/*.hpp)
+# Different bc cmake sucks:
+GPU_BUILD_PATH :=	$(GPU_OBJNAME)/build
 
 # Targets
 
@@ -50,6 +60,13 @@ clean:
 	rm -rf $(PGRMR_OBJNAME)
 	rm -rf $(MENU_BUILD_PATH)
 	rm -rf $(MENU_OBJNAME)
+	rm -rf pico-sdk
+	rm -rf $(GPU_OBJNAME).uf2
+	rm -rf $(GPU_BUILD_PATH)
+	rm -rf $(GPU_OBJNAME)/pico_sdk_import.cmake
+	rm -rf $(GPU_OBJNAME)/pico_extras_import.cmake
+	rm -rf build
+	rm -rf libraries
 
 ### Download and locally install arduino-cli and libraries
 
@@ -68,6 +85,22 @@ $(ARDC):
 		$(ARDC) --config-file=$(ARD_CONF) lib install \
 			"$(subst \_, ,$(lib))"; \
 	)
+
+### Download and locally install pico-sdk and pico-extras
+
+pico-sdk:
+	git clone -b master https://github.com/raspberrypi/pico-sdk.git
+	cd pico-sdk; git submodule update --init
+
+pico-extras:
+	git clone -b master https://github.com/raspberrypi/pico-extras.git
+	cd pico-extras; git submodule update --init
+
+$(GPU_OBJNAME)/pico_sdk_import.cmake: pico-sdk
+	cp pico-sdk/external/pico_sdk_import.cmake $(GPU_OBJNAME)
+
+$(GPU_OBJNAME)/pico_extras_import.cmake: pico-extras
+	cp pico-extras/external/pico_extras_import.cmake $(GPU_OBJNAME)
 
 ## Main Targets
 
@@ -104,3 +137,29 @@ upload-pgrmr: $(PGRMR_OBJNAME)
 		-p $(PORT) -i $<
 
 ### Note: We don't need to upload the menu program
+
+### Build gpu program
+
+$(GPU_OBJNAME).uf2: $(GPU_OBJNAME)/pico_sdk_import.cmake $(GPU_SRC) $(GPU_HFILES) $(GPU_OBJNAME)/CMakeLists.txt $(GPU_OBJNAME)/pico_extras_import.cmake
+	mkdir -p $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/lib $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/src $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/cmake $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/tools $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/external $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/test $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/docs $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/CMakeLists.txt $(GPU_BUILD_PATH)/pico-sdk
+	cp pico-sdk/*.cmake $(GPU_BUILD_PATH)/pico-sdk
+
+	mkdir -p $(GPU_BUILD_PATH)/pico-extras
+	cp -r pico-extras/lib $(GPU_BUILD_PATH)/pico-extras
+	cp -r pico-extras/src $(GPU_BUILD_PATH)/pico-extras
+	cp -r pico-extras/external $(GPU_BUILD_PATH)/pico-extras
+	cp -r pico-extras/test $(GPU_BUILD_PATH)/pico-extras
+	cp -r pico-extras/CMakeLists.txt $(GPU_BUILD_PATH)/pico-extras
+	cp pico-extras/*.cmake $(GPU_BUILD_PATH)/pico-extras
+
+	cd $(GPU_BUILD_PATH); PICO_SDK_PATH=pico-sdk PICO_EXTRAS_PATH=pico-extras cmake ..
+	make -C $(GPU_BUILD_PATH)
+	cp $(GPU_BUILD_PATH)/$@ .

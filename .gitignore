@@ -7,4 +7,13 @@ libraries/
 # Arduino binaries
 *.hex
 
+# Pico SDK stuff
+pico-sdk/
+pico_sdk_import.cmake
+pico-extras/
+pico_extras_import.cmake
+
+# Pico binaries
+*.uf2
+
 .vscode/
