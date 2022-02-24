@@ -1,0 +1,10 @@
+# arduino-cli stuff
+arduino-cli/
+build/
+*.tar.gz
+libraries/
+
+# Arduino binaries
+*.hex
+
+.vscode/
