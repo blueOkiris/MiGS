@@ -24,3 +24,7 @@ __Programming MCU:__
 - [Programs the Logic MCU from SD card](https://baldwisdom.com/bootdrive/)
 - Provides access to sd card data for the Logic MCU
 - Processes controller inputs to actually select a game (menu program "fake")
+
+__Error Receiver__
+- Serial connection to programmer for debugging
+- Requires enabling debug flag in programmer's .hpp files and connecting programmer 5, 4 to this device's 4, 5
