@@ -60,11 +60,13 @@ clean:
 	rm -rf $(PGRMR_OBJNAME)
 	rm -rf $(MENU_BUILD_PATH)
 	rm -rf $(MENU_OBJNAME)
+	rm -rf PicoDVI
 	rm -rf pico-sdk
 	rm -rf $(GPU_OBJNAME).uf2
 	rm -rf $(GPU_BUILD_PATH)
 	rm -rf $(GPU_OBJNAME)/pico_sdk_import.cmake
-	rm -rf $(GPU_OBJNAME)/pico_extras_import.cmake
+	rm -rf $(GPU_OBJNAME)/libdvi
+	rm -rf $(GPU_OBJNAME)/include/common_dvi_pin_configs.h
 	rm -rf build
 	rm -rf libraries
 
@@ -88,19 +90,28 @@ $(ARDC):
 
 ### Download and locally install pico-sdk and pico-extras
 
-pico-sdk:
+$(GPU_OBJNAME)/build/pico-sdk:
 	git clone -b master https://github.com/raspberrypi/pico-sdk.git
 	cd pico-sdk; git submodule update --init
 
-pico-extras:
-	git clone -b master https://github.com/raspberrypi/pico-extras.git
-	cd pico-extras; git submodule update --init
+	mkdir -p $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/lib $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/src $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/cmake $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/tools $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/external $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/test $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/docs $(GPU_BUILD_PATH)/pico-sdk
+	cp -r pico-sdk/CMakeLists.txt $(GPU_BUILD_PATH)/pico-sdk
+	cp pico-sdk/*.cmake $(GPU_BUILD_PATH)/pico-sdk
 
-$(GPU_OBJNAME)/pico_sdk_import.cmake: pico-sdk
-	cp pico-sdk/external/pico_sdk_import.cmake $(GPU_OBJNAME)
+$(GPU_OBJNAME)/libdvi:
+	git clone -b master https://github.com/Wren6991/PicoDVI
+	cp -r PicoDVI/software/libdvi $(GPU_OBJNAME)
+	cp PicoDVI/software/include/common_dvi_pin_configs.h $(GPU_OBJNAME)/include
 
-$(GPU_OBJNAME)/pico_extras_import.cmake: pico-extras
-	cp pico-extras/external/pico_extras_import.cmake $(GPU_OBJNAME)
+$(GPU_OBJNAME)/pico_sdk_import.cmake: $(GPU_OBJNAME)/build/pico-sdk
+	cp $(GPU_OBJNAME)/build/pico-sdk/external/pico_sdk_import.cmake $(GPU_OBJNAME)
 
 ## Main Targets
 
@@ -140,26 +151,7 @@ upload-pgrmr: $(PGRMR_OBJNAME)
 
 ### Build gpu program
 
-$(GPU_OBJNAME).uf2: $(GPU_OBJNAME)/pico_sdk_import.cmake $(GPU_SRC) $(GPU_HFILES) $(GPU_OBJNAME)/CMakeLists.txt $(GPU_OBJNAME)/pico_extras_import.cmake
-	mkdir -p $(GPU_BUILD_PATH)/pico-sdk
-	cp -r pico-sdk/lib $(GPU_BUILD_PATH)/pico-sdk
-	cp -r pico-sdk/src $(GPU_BUILD_PATH)/pico-sdk
-	cp -r pico-sdk/cmake $(GPU_BUILD_PATH)/pico-sdk
-	cp -r pico-sdk/tools $(GPU_BUILD_PATH)/pico-sdk
-	cp -r pico-sdk/external $(GPU_BUILD_PATH)/pico-sdk
-	cp -r pico-sdk/test $(GPU_BUILD_PATH)/pico-sdk
-	cp -r pico-sdk/docs $(GPU_BUILD_PATH)/pico-sdk
-	cp -r pico-sdk/CMakeLists.txt $(GPU_BUILD_PATH)/pico-sdk
-	cp pico-sdk/*.cmake $(GPU_BUILD_PATH)/pico-sdk
-
-	mkdir -p $(GPU_BUILD_PATH)/pico-extras
-	cp -r pico-extras/lib $(GPU_BUILD_PATH)/pico-extras
-	cp -r pico-extras/src $(GPU_BUILD_PATH)/pico-extras
-	cp -r pico-extras/external $(GPU_BUILD_PATH)/pico-extras
-	cp -r pico-extras/test $(GPU_BUILD_PATH)/pico-extras
-	cp -r pico-extras/CMakeLists.txt $(GPU_BUILD_PATH)/pico-extras
-	cp pico-extras/*.cmake $(GPU_BUILD_PATH)/pico-extras
-
-	cd $(GPU_BUILD_PATH); PICO_SDK_PATH=pico-sdk PICO_EXTRAS_PATH=pico-extras cmake ..
+$(GPU_OBJNAME).uf2: $(GPU_OBJNAME)/pico_sdk_import.cmake $(GPU_SRC) $(GPU_HFILES) $(GPU_OBJNAME)/CMakeLists.txt $(GPU_OBJNAME)/libdvi
+	cd $(GPU_BUILD_PATH); PICO_SDK_PATH=pico-sdk PICO_EXTRAS_PATH=pico-extras cmake -DPICO_COPY_TO_RAM=1 ..
 	make -C $(GPU_BUILD_PATH)
 	cp $(GPU_BUILD_PATH)/$@ .

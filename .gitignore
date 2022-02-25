@@ -10,8 +10,11 @@ libraries/
 # Pico SDK stuff
 pico-sdk/
 pico_sdk_import.cmake
-pico-extras/
-pico_extras_import.cmake
+PicoDVI/
+libdvi/
+common_dvi_pin_configs.h
+cmake-3.*/
+cmake-3.*.sh
 
 # Pico binaries
 *.uf2

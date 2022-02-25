@@ -11,7 +11,7 @@ A cheap and easy to program game console based on multiple microcontrollers inte
   + gcc
   + make
   + git
-  + cmake
+  + wget
   + gcc-arm-none-eabi
   + libnewlib-arm-none-eabi
 
