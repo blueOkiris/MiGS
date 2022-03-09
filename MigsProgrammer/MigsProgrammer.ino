@@ -9,6 +9,7 @@
  */
 
 #include "AvrProgrammer.hpp"
+#include "ResourceProvider.hpp"
 
 const uint32_t g_bootBaud = 115200; // Baud rate for programming over serial
 #if defined(PGRMR_DEBUG)
@@ -28,9 +29,10 @@ pgrmr::AvrProgrammer g_programmer(
     , 4, 5, g_errBaud
 #endif
 );
+rsrc::ResourceProvider g_resourceProvider;
 
 void setup(void) {
-    Serial.begin(g_bootBaud); // Required for AvrProgrammer to work. Can't be in
+    Serial.begin(g_bootBaud); // Required for AvrProgrammer to work
 
     pinMode(g_chipSelect, OUTPUT);
     if(!SD.begin(g_chipSelect)) {
@@ -54,5 +56,5 @@ void setup(void) {
 }
 
 void loop(void) {
-
+    g_resourceProvider.provide();
 }

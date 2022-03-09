@@ -1,9 +1,9 @@
 /*
  * Author: Dylan Turner
  * Description:
- *  - Const data and function location for Stk500.hpp
- *  - Based on
- *      https://github.com/osbock/Baldwisdom/blob/master/BootDrive/BootDrive.ino
+ * - Const data and function location for Stk500.hpp
+ * - Based on
+ *     https://github.com/osbock/Baldwisdom/blob/master/BootDrive/BootDrive.ino
  */
 
 #include <Arduino.h>

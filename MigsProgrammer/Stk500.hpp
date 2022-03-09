@@ -1,9 +1,9 @@
 /*
  * Author: Dylan Turner
  * Description:
- *  - Implementation of AVR061 STK500 Comm protocol
- *  - Based on:
- *      https://github.com/osbock/Baldwisdom/blob/master/BootDrive/stk500.h
+ * - Implementation of AVR061 STK500 Comm protocol
+ * - Based on:
+ *     https://github.com/osbock/Baldwisdom/blob/master/BootDrive/stk500.h
  */
 
 #pragma once
