@@ -19,7 +19,7 @@ const uint32_t g_errBaud = 19200;
 const uint32_t g_chipSelect = 10; // Chip select for SD card
 const uint32_t g_reset = 6; // Reset pin for other arduino
 
-const char *g_progName = "blink.hex";
+const char *g_progName = "menu.hex";
 
 pgrmr::AvrProgrammer g_programmer(
     g_chipSelect, g_reset

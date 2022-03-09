@@ -43,6 +43,7 @@ target_link_libraries(
     hardware_pwm
     hardware_gpio
     hardware_sync
+    hardware_i2c
 )
 
 pico_add_extra_outputs(MigsGpu)
