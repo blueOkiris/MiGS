@@ -9,20 +9,15 @@ extern "C" {
     #include <pico/stdlib.h>
     #include <pico/multicore.h>
     #include <hardware/vreg.h>
-    #include <dvi.h>
-    #include <dvi_timing.h>
     #include <hardware/irq.h>
     #include <hardware/sync.h>
     #include <hardware/i2c.h>
+    #include <dvi.h>
+    #include <dvi_timing.h>
+    #include <tmds_encode.h>
     #include <common_dvi_pin_configs.h>
-
-    // TODO: This is temporary while testing. Will be removed
-    #include "../../PicoDVI/software/assets/testcard_320x240_rgb565.h"
 }
-
-const int g_cpuI2cAddr = 0x7C;
-const int g_frameWidth = 320;
-const int g_frameHeight = 240;
+#include <font8x8.hpp>
 
 // DVDD 1.2V
 #define VREG_VSEL       VREG_VOLTAGE_1_20
@@ -32,14 +27,22 @@ const int g_frameHeight = 240;
 #define q_color_free    q_colour_free
 #define q_color_valid   q_colour_valid
 
-dvi_inst g_dvi;
-
 void initDvi(void);
 void startDviSignaling(void);
+void drawTextScanline(int y);
 void drawScanline(const uint16_t *scanLine);
 
 void initI2c(void);
 char detectCpu(void);
+
+const int g_cpuI2cAddr = 0x7C;
+const int g_frameWidth = 320;
+const int g_frameHeight = 240;
+const int g_charCols = g_frameWidth / FONT_CHAR_WIDTH;
+const int g_charRows = g_frameHeight / FONT_CHAR_HEIGHT;
+
+dvi_inst g_dvi;
+char g_textBuff[g_charRows][g_charCols];
 
 // Do color buff/init in Core1
 void core1_main(void) {
@@ -62,7 +65,9 @@ void core1_main(void) {
                 int y = drawCmd[3];
                 char *text = (char *) (drawCmd + 4);
 
-                //"drawText(x, y, text);"
+                for(int i = 0; text[i] != '\0'; i++) {
+                    g_textBuff[y][x + i] = text[i];
+                }
             } break;
         }
     }
@@ -76,24 +81,32 @@ int main() {
 
     setup_default_uart();
 
+    for(int y = 0; y < g_charRows; y++) {
+        for(int x = 0; x < g_charCols; x++) {
+            g_textBuff[y][x] = ' ';
+        }
+    }
+
     initI2c();
 
     initDvi();
     multicore_launch_core1(core1_main);
 
     // Push data from image and then remove it to put the next one
-    uint frameCtr = 0;
+    //uint frameCtr = 0;
     while(true) {
-        for(uint y = 0; y < g_frameHeight; y++) { // Draw each line
-            uint yScroll = (y + frameCtr) % g_frameHeight; // Relative to ctr
+        for(int y = 0; y < g_frameHeight; y++) { // Draw each line
+            /*uint yScroll = (y + frameCtr) % g_frameHeight; // Relative to ctr
 
             // Get the right line and send to dvi
             const uint16_t *scanLine = &((const uint16_t *) testcard_320x240)[
                 yScroll * g_frameWidth
             ];
-            drawScanline(scanLine);
+            drawScanline(scanLine);*/
+
+            drawTextScanline(y);
         }
-        frameCtr++;
+        //frameCtr++;
     }
 
     return 0;
@@ -123,11 +136,27 @@ void startDviSignaling(void) {
     dvi_scanbuf_main_16bpp(&g_dvi);
 }
 
+// Draw the font characters to the screen from the buffer
+void drawTextScanline(int y) {
+    uint8_t scanBuff[g_frameWidth / 8]; // Only monochrome supported rn
+    for(int x = 0; x < g_charCols; x++) {
+        char c = scanBuff[x + y / 8 * g_charCols];
+        scanBuff[x] = font8x8[
+            (c - FONT_FIRST_ASCII) + (y % FONT_CHAR_HEIGHT) + FONT_N_CHARS
+        ];
+    }
+    
+    uint32_t *scanLine = nullptr;
+    tmds_encode_1bpp((const uint32_t *) scanBuff, scanLine, g_frameWidth);
+    queue_add_blocking_u32(&g_dvi.q_tmds_valid, &scanLine);
+    while(queue_try_remove_u32(&g_dvi.q_tmds_valid, &scanLine));
+}
+
 // Push a scanline buffer
-void drawScanline(const uint16_t *scanLine) {
+/*void drawScanline(const uint16_t *scanLine) {
     queue_add_blocking_u32(&g_dvi.q_color_valid, &scanLine);
     while(queue_try_remove_u32(&g_dvi.q_color_free, &scanLine));
-}
+}*/
 
 void initI2c(void) {
     i2c_init(i2c1, 100 * 1000);

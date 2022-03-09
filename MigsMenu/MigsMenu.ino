@@ -10,9 +10,9 @@
 
 const int g_i2cAddr = 0x7C;
 const int g_numDispGames = 10;
-const uint16_t g_textXOffset = 10;
-const uint8_t g_textYOffset = 10;
-const uint8_t g_textYSpacing = 10;
+const uint16_t g_textXOffset = 14;
+const uint8_t g_textYOffset = 4;
+const uint8_t g_textYSpacing = 2;
 const int g_fNameLenLimit = 13; // 8.3
 
 int g_listInd = 0;
