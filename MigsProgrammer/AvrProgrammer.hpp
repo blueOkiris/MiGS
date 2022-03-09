@@ -16,8 +16,13 @@
 namespace pgrmr {
     class AvrProgrammer {
         public:
+#if defined(PGRMR_DEBUG)
+            static void error(const stk500::Error error, const char *msg);
+            static void warning(const stk500::Error error, const char *msg);
+#endif
+
             AvrProgrammer(
-                const int chipSelect, const int reset
+                const int reset
 #if defined(PGRMR_DEBUG)
                 , const int errTx, const int errRx,
                 const int errBaudRate
@@ -25,15 +30,10 @@ namespace pgrmr {
             );
 
             void init(void);
-            void program(const char *fileName);
+            void program(File program);
         
         private:
-#if defined(PGRMR_DEBUG)
-            static void _error(const stk500::Error error, const char *msg);
-            static void _warning(const stk500::Error error, const char *msg);
-#endif
-
-            const int _chipSelect, _reset;
+            const int _reset;
             stk500::AvrMem _mem;
 
 #if defined(PGRMR_DEBUG)

@@ -20,7 +20,6 @@ uint8_t g_lineBuff[50];
 
 #if defined(PGRMR_DEBUG)
 // Error messages (for space)
-const char *g_sdInitErrMsg = "Failed to init SD card.";
 const char *g_syncErrMsg = "Problem getting in sync.";
 const char *g_sdFileNotFoundErrMsg = "Failed while opening file.";
 const char *g_pgrmModeErrMsg = "Problem entering program mode.";
@@ -35,15 +34,13 @@ SoftwareSerial *g_errorSender = nullptr;
 #endif
 
 #if !defined(PGRMR_DEBUG)
-AvrProgrammer::AvrProgrammer(
-        const int chipSelect, const int reset) :
-        _chipSelect(chipSelect), _reset(reset) {
+AvrProgrammer::AvrProgrammer(const int reset) : _reset(reset) {
 }
 #else
 AvrProgrammer::AvrProgrammer(
-        const int chipSelect, const int reset,
+        const int reset,
         const int errTx, const int errRx, const int errBaudRate) :
-        _chipSelect(chipSelect), _reset(reset),
+        _reset(reset),
         _errorSender(errRx, errTx),
         _errTx(errTx), _errRx(errRx), _errBaudRate(errBaudRate) {
 }
@@ -56,26 +53,17 @@ void AvrProgrammer::init(void) {
     _errorSender.begin(_errBaudRate);
     g_errorSender = &_errorSender;
 #endif
-    pinMode(_chipSelect, OUTPUT);
     pinMode(_reset, OUTPUT);
     digitalWrite(_reset, HIGH);
 
     _mem.buff = g_memPage;
-
-    if(!SD.begin(_chipSelect)) {
-#if defined(PGRMR_DEBUG)
-        _error(stk500::Error::Generic, g_sdInitErrMsg);
-#else
-        exit(1);
-#endif
-    }
 
 #if defined(PGRMR_DEBUG)
     _errorSender.println(F("SD Card initialized."));
 #endif
 }
 
-void AvrProgrammer::program(const char *fileName) {
+void AvrProgrammer::program(File program) {
     // Reset other arduino, get in sync, and get its software info
     digitalWrite(_reset, HIGH);
     delay(100);
@@ -84,12 +72,6 @@ void AvrProgrammer::program(const char *fileName) {
 
 #if !defined(PGRMR_DEBUG)
     stk500::getSync();
-
-    // Read hex file from SD card
-    if(!SD.exists(fileName)) {
-        while(1);
-    }
-    File program = SD.open(fileName, FILE_READ);
 
     stk500::programEnable();
     while(_readPage(program, _mem)) {
@@ -105,38 +87,31 @@ void AvrProgrammer::program(const char *fileName) {
 #else
     g_err = stk500::getSync();
     if(g_err != stk500::Error::None) {
-        _warning(g_err, g_syncErrMsg);
+        warning(g_err, g_syncErrMsg);
     }
-
-    // Read hex file from SD card
-    if(!SD.exists(fileName)) {
-        _error(stk500::Error::Generic, g_sdFileNotFoundErrMsg);
-    }
-    File program = SD.open(fileName, FILE_READ);
-    _errorSender.println(F("Loaded program successfully."));
 
     // Program arduino
-    g_err = stk500::programEnable(_error);
+    g_err = stk500::programEnable(error);
     if(g_err != stk500::Error::None) {
-        _warning(g_err, g_pgrmModeErrMsg);
+        warning(g_err, g_pgrmModeErrMsg);
     }
     _errorSender.println(F("Entered program mode."));
     while(_readPage(program, _mem)) {
-        g_err = stk500::loadAddr(_mem.pageAddr >> 1, _error);
+        g_err = stk500::loadAddr(_mem.pageAddr >> 1, error);
         if(g_err != stk500::Error::None) {
-            _warning(g_err, g_loadAddrErrMsg);
+            warning(g_err, g_loadAddrErrMsg);
         }
-        g_err = stk500::pagedWrite(_mem, _error);
+        g_err = stk500::pagedWrite(_mem, error);
         if(g_err != stk500::Error::None) {
-            _warning(g_err, g_pagedWriteErrMsg);
+            warning(g_err, g_pagedWriteErrMsg);
         }
     }
     _errorSender.println(F("Finished programming."));
 
     // Close out
-    g_err = stk500::disableDevice(_error);
+    g_err = stk500::disableDevice(error);
     if(g_err != stk500::Error::None) {
-        _warning(g_err, g_disableErrMsg);
+        warning(g_err, g_disableErrMsg);
     }
     delay(10);
     _toggleReset();
@@ -224,7 +199,7 @@ uint8_t AvrProgrammer::_hexToByte(const uint8_t *code) const {
 }
 
 #if defined(PGRMR_DEBUG)
-void AvrProgrammer::_error(const stk500::Error error, const char *msg) {
+void AvrProgrammer::error(const stk500::Error error, const char *msg) {
     int errInd = -static_cast<int>(error);
     g_errorSender->print(F("Error: "));
     g_errorSender->print(msg);
@@ -234,7 +209,7 @@ void AvrProgrammer::_error(const stk500::Error error, const char *msg) {
     while(true);
 }
 
-void AvrProgrammer::_warning(const stk500::Error error, const char *msg) {
+void AvrProgrammer::warning(const stk500::Error error, const char *msg) {
     int errInd = -static_cast<int>(error);
     g_errorSender->print(F("Warning: "));
     g_errorSender->print(msg);

@@ -13,6 +13,7 @@
 const uint32_t g_bootBaud = 115200; // Baud rate for programming over serial
 #if defined(PGRMR_DEBUG)
 const uint32_t g_errBaud = 19200;
+const char *g_sdInitErrMsg = "Failed to init SD card.";
 #endif
 
 // Pins
@@ -22,7 +23,7 @@ const uint32_t g_reset = 6; // Reset pin for other arduino
 const char *g_progName = "menu.hex";
 
 pgrmr::AvrProgrammer g_programmer(
-    g_chipSelect, g_reset
+    g_reset
 #if defined(PGRMR_DEBUG)
     , 4, 5, g_errBaud
 #endif
@@ -30,9 +31,26 @@ pgrmr::AvrProgrammer g_programmer(
 
 void setup(void) {
     Serial.begin(g_bootBaud); // Required for AvrProgrammer to work. Can't be in
+
+    pinMode(g_chipSelect, OUTPUT);
+    if(!SD.begin(g_chipSelect)) {
+#if defined(PGRMR_DEBUG)
+        pgrmr::AvrProgrammer::error(stk500::Error::Generic, g_sdInitErrMsg);
+#else
+        exit(1);
+#endif
+    }
+
     g_programmer.init();
     delay(500);
-    g_programmer.program(g_progName);
+
+    // Read hex file from SD card
+    if(!SD.exists(g_progName)) {
+        while(1);
+    }
+    File program = SD.open(g_progName, FILE_READ);
+
+    g_programmer.program(program);
 }
 
 void loop(void) {
