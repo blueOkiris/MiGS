@@ -24,6 +24,10 @@ void ResourceProvider::provide(void) {
                 case 'F':
                     // TODO: Read a file and send its contents over serial
                     break;
+
+                case 'L':
+                    // TODO: Send list of games over serial
+                    break;
             }
         }
     }
