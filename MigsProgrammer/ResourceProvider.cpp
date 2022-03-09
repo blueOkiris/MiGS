@@ -9,8 +9,10 @@
 
 using namespace rsrc;
 
+const int g_fNameLenLimit = 13;
+
 // Save on dynamic resource breaking system by using globals
-char g_fName[13]; // Only allow root dir 8.3 filenames + \0 for now
+char g_fName[g_fNameLenLimit]; // Only allow root dir 8.3 filenames + \0 for now
 int g_fNameInd = 0;
 File g_program, g_entry;
 
@@ -49,8 +51,9 @@ void ResourceProvider::provide(void) {
                             break;
                         }
 
+                        Serial.write('F');
                         for(g_fNameInd = 0;
-                                g_fNameInd < strlen(g_entry.name());
+                                g_fNameInd < g_fNameLenLimit;
                                 g_fNameInd++) {
                             Serial.write(g_entry.name()[g_fNameInd]);
                         }
