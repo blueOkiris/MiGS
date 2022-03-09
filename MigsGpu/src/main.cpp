@@ -31,10 +31,33 @@ extern "C" {
 
 dvi_inst g_dvi;
 
-void init_dvi(void);
-void start_dvi_signaling(void);
-void draw_scanline(const uint16_t **scanLine);
+void draw_scanline(const uint16_t *scanLine);
 
+// DVI-specific functions
+void init_dvi(void) {
+    // Set up DVI
+    g_dvi.timing = &DVI_TIMING;
+    g_dvi.ser_cfg = DVI_DEFAULT_SERIAL_CONFIG;
+    dvi_init(
+        &g_dvi,
+        next_striped_spin_lock_num(),
+        next_striped_spin_lock_num()
+    );
+}
+
+// Waits till it sees the first color buff and then starts up signal
+void start_dvi_signaling(void) {
+    // Try to set it up
+    dvi_register_irqs_this_core(&g_dvi, DMA_IRQ_0);
+    while(queue_is_empty(&g_dvi.q_color_valid)) {
+        __wfe(); // "Wait For Event"
+    }
+
+    dvi_start(&g_dvi);
+    dvi_scanbuf_main_16bpp(&g_dvi);
+}
+
+// Do color buff/init in Core1
 void core1_main(void) {
     start_dvi_signaling();
 
@@ -51,7 +74,6 @@ int main() {
 
     init_dvi();
 
-    // Core 1 waits till it sees the first color buff and then starts up signal
     multicore_launch_core1(core1_main);
 
     // Push data from image and then remove it to put the next one
@@ -64,36 +86,16 @@ int main() {
             const uint16_t *scanLine = &((const uint16_t *) testcard_320x240)[
                 y_scroll * FRAME_WIDTH
             ];
-            draw_scanline(&scanLine);
+            draw_scanline(scanLine);
         }
+        frame_ctr++;
     }
+
     return 0;
 }
 
-// DVI-specific functions
-void init_dvi(void) {
-    // Set up DVI
-    g_dvi.timing = &DVI_TIMING;
-    g_dvi.ser_cfg = DVI_DEFAULT_SERIAL_CONFIG;
-    dvi_init(
-        &g_dvi,
-        next_striped_spin_lock_num(),
-        next_striped_spin_lock_num()
-    );
-}
-
-void start_dvi_signaling(void) {
-    // Try to set it up
-    dvi_register_irqs_this_core(&g_dvi, DMA_IRQ_0);
-    while(queue_is_empty(&g_dvi.q_color_valid)) {
-        __wfe(); // "Wait For Event"
-    }
-
-    dvi_start(&g_dvi);
-    dvi_scanbuf_main_16bpp(&g_dvi);
-}
-
-void draw_scanline(const uint16_t **scanLine) {
-    queue_add_blocking_u32(&g_dvi.q_color_free, &scanLine);
+// Push a scanline buffer
+void draw_scanline(const uint16_t *scanLine) {
+    queue_add_blocking_u32(&g_dvi.q_color_valid, &scanLine);
     while(queue_try_remove_u32(&g_dvi.q_color_free, &scanLine));
 }
