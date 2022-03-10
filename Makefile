@@ -150,6 +150,17 @@ upload-pgrmr: $(PGRMR_OBJNAME)
 		--fqbn $(PGRMR_BOARD_FQBN) \
 		-p $(PORT) -i $<
 
+### Upload menu code
+#### Just used for debuggin
+#### Takes paramater PORT
+
+.PHONY: upload-menu
+upload-menu: $(MENU_OBJNAME)
+	$(ARDC) upload \
+		--config-file=$(ARD_CONF) \
+		--fqbn $(MENU_BOARD_FQBN) \
+		-p $(PORT) -i $<
+
 ### Note: We don't need to upload the menu program
 
 ### Build gpu program

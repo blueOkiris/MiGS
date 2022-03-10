@@ -15,6 +15,7 @@ const uint16_t g_textXOffset = 14;
 const uint8_t g_textYOffset = 4;
 const uint8_t g_textYSpacing = 2;
 const int g_fNameLenLimit = 13; // 8.3
+const uint16_t g_bg = 0x07FF;
 
 int g_listInd = 0;
 char g_gameList[g_numDispGames][g_fNameLenLimit] = {
@@ -32,16 +33,25 @@ char g_gameList[g_numDispGames][g_fNameLenLimit] = {
 
 // Flags for sending updated data
 bool g_updateListText = false;
+bool g_setBg = true;
+
+// Data to send
+uint8_t g_sendBuff[129];
 
 void setup(void) {
     // Set up communication with the programmer/resource getter
     Serial.begin(115200);
-    loadGameList();
+    //loadGameList();
 
     // Set up communication to the GPU
     Wire.begin(g_i2cAddr);
     Wire.onRequest(requestEvent);
     Wire.onReceive(receiveEvent);
+
+    for(int i = 0; i < 129; i++) {
+        g_sendBuff[i] = 0;
+    }
+    g_sendBuff[0] = 0x55;
 }
 
 // We're mostly interested in sending data TO the GPU, so this doesn't do much
@@ -52,7 +62,12 @@ void receiveEvent(int bytesRecv) {
 }
 
 void requestEvent() {
-    if(g_updateListText) {
+    if(g_setBg) {
+        Wire.write('B');
+        Wire.write((uint8_t) ((g_bg >> 8) & 0xFF));
+        Wire.write((uint8_t) (g_bg & 0xFF));
+        g_setBg = false;
+    } else if(g_updateListText) {
         for(int i = 0; i < g_numDispGames; i++) {
             Wire.write('T');
             Wire.write((uint8_t) ((g_textXOffset >> 8) & 0xFF));

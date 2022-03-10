@@ -51,4 +51,7 @@ target_link_libraries(
     hardware_i2c
 )
 
+pico_enable_stdio_usb(MigsGpu 1)
+pico_enable_stdio_uart(MigsGpu 0)
+
 pico_add_extra_outputs(MigsGpu)

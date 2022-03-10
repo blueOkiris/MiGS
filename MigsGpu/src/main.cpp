@@ -35,7 +35,6 @@ extern "C" {
 #define q_color_valid   q_colour_valid
 
 void initDvi(void);
-void startDviSignaling(void);
 void drawTextScanline(int y);
 void drawScanline(const uint16_t *scanLine);
 
@@ -55,28 +54,18 @@ dvi_inst g_dvi;
 uint16_t g_staticScanBuff[g_scanBuffCount][g_frameWidth];
 std::vector<sprite_t> g_sprs;
 std::vector<SprBuff> g_sprData;
+uint16_t g_bg = 0x0000;
 
 // Do color buff/init in Core1
 void core1_main(void) {
-    startDviSignaling();
-
-    uint8_t drawCmd[128];
-    while(true) {
-        if(i2c_read_blocking(i2c1, g_cpuI2cAddr, drawCmd, 128, false) < 1) {
-            continue;
-        }
-
-        switch(drawCmd[0]) {
-            // Do nothing
-            case 0x55:
-                break;
-
-            // Draw text to screen
-            case 'T': {
-                
-            } break;
-        }
+    // Try to set it up
+    dvi_register_irqs_this_core(&g_dvi, DMA_IRQ_0);
+    while(queue_is_empty(&g_dvi.q_color_valid)) {
+        __wfe(); // "Wait For Event"
     }
+
+    dvi_start(&g_dvi);
+    dvi_scanbuf_main_16bpp(&g_dvi); // This is an infinite loop
 }
 
 int main() {
@@ -85,6 +74,7 @@ int main() {
     sleep_ms(10);
     set_sys_clock_khz(DVI_TIMING.bit_clk_khz, true);
 
+    stdio_init_all();
     setup_default_uart();
 
     initI2c();
@@ -104,21 +94,50 @@ int main() {
         sprBuff.data[i + 1] = 0b00000111;
     }
     g_sprData.push_back(sprBuff);
-    g_sprs.push_back(sprite_t {
-        27, 13,
-        g_sprData[g_sprData.size() - 1].data,
-        3, false,
-        false, false
-    });
+    for(int y = 0; y < 3; y++) {
+        for(int x = 0; x < g_frameWidth / 8; x += 3) {
+            g_sprs.push_back(sprite_t {
+                x * 8, y * 8,
+                g_sprData[g_sprData.size() - 1].data,
+                3, false,
+                false, false
+            });
+        }
+    }
+
+    uint8_t drawCmd[128];
+    uint8_t delayCtr = 0; // Only read updates every fractional time
     while(true) {
         for(int y = 0; y < g_frameHeight; y++) {
             uint16_t *pixBuff = nullptr;
             queue_remove_blocking(&g_dvi.q_color_free, &pixBuff);
-            sprite_fill16(pixBuff, 0x0000, g_frameWidth);
+            sprite_fill16(pixBuff, g_bg, g_frameWidth);
             for(size_t i = 0; i < g_sprs.size(); i++) {
                 sprite_sprite16(pixBuff, &g_sprs[i], y, g_frameWidth);
             }
             queue_add_blocking(&g_dvi.q_color_valid, &pixBuff);
+        }
+
+        if(delayCtr++ % 40 == 0) {
+            if(i2c_read_blocking(i2c1, g_cpuI2cAddr, drawCmd, 1, false) > 0) {
+                switch(drawCmd[0]) {
+                    // Do nothing
+                    case 0x55:
+                        break;
+
+                    // Draw text to screen
+                    case 'T': {
+                        
+                    } break;
+
+                    case 'B':
+                        i2c_read_blocking(
+                            i2c1, g_cpuI2cAddr, drawCmd, 2, false
+                        );
+                        g_bg = (((uint16_t) drawCmd[0]) << 8) + drawCmd[1];
+                        break;
+                }
+            }
         }
     }
 
@@ -135,18 +154,6 @@ void initDvi(void) {
         next_striped_spin_lock_num(),
         next_striped_spin_lock_num()
     );
-}
-
-// Waits till it sees the first color buff and then starts up signal
-void startDviSignaling(void) {
-    // Try to set it up
-    dvi_register_irqs_this_core(&g_dvi, DMA_IRQ_0);
-    while(queue_is_empty(&g_dvi.q_color_valid)) {
-        __wfe(); // "Wait For Event"
-    }
-
-    dvi_start(&g_dvi);
-    dvi_scanbuf_main_16bpp(&g_dvi);
 }
 
 void initI2c(void) {
