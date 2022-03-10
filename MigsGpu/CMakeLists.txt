@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
-add_compile_options(-Wall)
+add_compile_options(-Wall -Wno-narrowing)
 
 add_executable(
     MigsGpu
@@ -20,13 +20,18 @@ add_executable(
     libdvi/dvi_timing.c
     libdvi/tmds_encode.c
     libdvi/tmds_encode.S
+
+    libsprite/sprite.c
+    libsprite/sprite.S
+    libsprite/tile.c
+    libsprite/tile.S
 )
 
 pico_generate_pio_header(MigsGpu ${CMAKE_CURRENT_LIST_DIR}/libdvi/dvi_serialiser.pio)
 pico_generate_pio_header(MigsGpu ${CMAKE_CURRENT_LIST_DIR}/libdvi/tmds_encode_1bpp.pio)
 
 include_directories(
-    include libdvi
+    include libdvi libsprite
 )
 
 target_link_libraries(

@@ -7,6 +7,7 @@
  */
 
 #include <Wire.h>
+#include "font.hpp"
 
 const int g_i2cAddr = 0x7C;
 const int g_numDispGames = 10;

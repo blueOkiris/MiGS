@@ -1,6 +1,13 @@
 /*
  * Author: Dylan Turner
- * Description: Entry point for GPU system
+ * Description:
+ * - Entry point for GPU system
+ * - Note the sprites are in the following RGAB5515 format:
+ *   + 2 byte pixels, little endian!
+ *   + 15-11 => r
+ *   + 10-6 => g
+ *   + 5 => a
+ *   + 4-0 => b
  */
 
 // This is all C code, so use extern "C" so func names are preserved
@@ -14,14 +21,14 @@ extern "C" {
     #include <hardware/i2c.h>
     #include <dvi.h>
     #include <dvi_timing.h>
-    #include <tmds_encode.h>
+    #include <sprite.h>
     #include <common_dvi_pin_configs.h>
 }
-#include <font8x8.hpp>
+#include <vector>
 
 // DVDD 1.2V
 #define VREG_VSEL       VREG_VOLTAGE_1_20
-#define DVI_TIMING      dvi_timing_640x480p_60hz
+#define DVI_TIMING      dvi_timing_960x540p_60hz
 
 // I only program in 'MURICAN
 #define q_color_free    q_colour_free
@@ -36,13 +43,18 @@ void initI2c(void);
 char detectCpu(void);
 
 const int g_cpuI2cAddr = 0x7C;
-const int g_frameWidth = 320;
-const int g_frameHeight = 240;
-const int g_charCols = g_frameWidth / FONT_CHAR_WIDTH;
-const int g_charRows = g_frameHeight / FONT_CHAR_HEIGHT;
+const int g_frameWidth = 480;
+const int g_frameHeight = 270;
+const int g_scanBuffCount = 4;
+
+struct SprBuff {
+    uint8_t data[8 * 8 * 2];
+};
 
 dvi_inst g_dvi;
-char g_textBuff[g_charRows][g_charCols];
+uint16_t g_staticScanBuff[g_scanBuffCount][g_frameWidth];
+std::vector<sprite_t> g_sprs;
+std::vector<SprBuff> g_sprData;
 
 // Do color buff/init in Core1
 void core1_main(void) {
@@ -61,13 +73,7 @@ void core1_main(void) {
 
             // Draw text to screen
             case 'T': {
-                int x = ((uint8_t) drawCmd[1] << 8) + drawCmd[2];
-                int y = drawCmd[3];
-                char *text = (char *) (drawCmd + 4);
-
-                for(int i = 0; text[i] != '\0'; i++) {
-                    g_textBuff[y][x + i] = text[i];
-                }
+                
             } break;
         }
     }
@@ -81,32 +87,39 @@ int main() {
 
     setup_default_uart();
 
-    for(int y = 0; y < g_charRows; y++) {
-        for(int x = 0; x < g_charCols; x++) {
-            g_textBuff[y][x] = ' ';
-        }
-    }
-
     initI2c();
 
     initDvi();
     multicore_launch_core1(core1_main);
 
-    // Push data from image and then remove it to put the next one
-    //uint frameCtr = 0;
+    // Allocate scanline buffer
+    for (int i = 0; i < g_scanBuffCount; ++i) {
+        void *buffPtr = &g_staticScanBuff[i];
+        queue_add_blocking((queue_t *) &g_dvi.q_color_free, &buffPtr);
+    }
+
+    SprBuff sprBuff;
+    for(int i = 0; i < 8 * 8 * 2; i += 2) {
+        sprBuff.data[i] = 0b11100000;
+        sprBuff.data[i + 1] = 0b00000111;
+    }
+    g_sprData.push_back(sprBuff);
+    g_sprs.push_back(sprite_t {
+        27, 13,
+        g_sprData[g_sprData.size() - 1].data,
+        3, false,
+        false, false
+    });
     while(true) {
-        for(int y = 0; y < g_frameHeight; y++) { // Draw each line
-            /*uint yScroll = (y + frameCtr) % g_frameHeight; // Relative to ctr
-
-            // Get the right line and send to dvi
-            const uint16_t *scanLine = &((const uint16_t *) testcard_320x240)[
-                yScroll * g_frameWidth
-            ];
-            drawScanline(scanLine);*/
-
-            drawTextScanline(y);
+        for(int y = 0; y < g_frameHeight; y++) {
+            uint16_t *pixBuff = nullptr;
+            queue_remove_blocking(&g_dvi.q_color_free, &pixBuff);
+            sprite_fill16(pixBuff, 0x0000, g_frameWidth);
+            for(size_t i = 0; i < g_sprs.size(); i++) {
+                sprite_sprite16(pixBuff, &g_sprs[i], y, g_frameWidth);
+            }
+            queue_add_blocking(&g_dvi.q_color_valid, &pixBuff);
         }
-        //frameCtr++;
     }
 
     return 0;
@@ -135,28 +148,6 @@ void startDviSignaling(void) {
     dvi_start(&g_dvi);
     dvi_scanbuf_main_16bpp(&g_dvi);
 }
-
-// Draw the font characters to the screen from the buffer
-void drawTextScanline(int y) {
-    uint8_t scanBuff[g_frameWidth / 8]; // Only monochrome supported rn
-    for(int x = 0; x < g_charCols; x++) {
-        char c = scanBuff[x + y / 8 * g_charCols];
-        scanBuff[x] = font8x8[
-            (c - FONT_FIRST_ASCII) + (y % FONT_CHAR_HEIGHT) + FONT_N_CHARS
-        ];
-    }
-    
-    uint32_t *scanLine = nullptr;
-    tmds_encode_1bpp((const uint32_t *) scanBuff, scanLine, g_frameWidth);
-    queue_add_blocking_u32(&g_dvi.q_tmds_valid, &scanLine);
-    while(queue_try_remove_u32(&g_dvi.q_tmds_valid, &scanLine));
-}
-
-// Push a scanline buffer
-/*void drawScanline(const uint16_t *scanLine) {
-    queue_add_blocking_u32(&g_dvi.q_color_valid, &scanLine);
-    while(queue_try_remove_u32(&g_dvi.q_color_free, &scanLine));
-}*/
 
 void initI2c(void) {
     i2c_init(i2c1, 100 * 1000);

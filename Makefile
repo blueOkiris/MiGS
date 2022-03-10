@@ -110,6 +110,9 @@ $(GPU_OBJNAME)/libdvi:
 	cp -r PicoDVI/software/libdvi $(GPU_OBJNAME)
 	cp PicoDVI/software/include/common_dvi_pin_configs.h $(GPU_OBJNAME)/include
 
+$(GPU_OBJNAME)/libsprite: $(GPU_OBJNAME)/libdvi
+	cp -r PicoDVI/software/libsprite $(GPU_OBJNAME)
+
 $(GPU_OBJNAME)/pico_sdk_import.cmake: $(GPU_OBJNAME)/build/pico-sdk
 	cp $(GPU_OBJNAME)/build/pico-sdk/external/pico_sdk_import.cmake $(GPU_OBJNAME)
 
@@ -151,7 +154,7 @@ upload-pgrmr: $(PGRMR_OBJNAME)
 
 ### Build gpu program
 
-$(GPU_OBJNAME).uf2: $(GPU_OBJNAME)/pico_sdk_import.cmake $(GPU_SRC) $(GPU_HFILES) $(GPU_OBJNAME)/CMakeLists.txt $(GPU_OBJNAME)/libdvi
+$(GPU_OBJNAME).uf2: $(GPU_OBJNAME)/pico_sdk_import.cmake $(GPU_SRC) $(GPU_HFILES) $(GPU_OBJNAME)/CMakeLists.txt $(GPU_OBJNAME)/libdvi $(GPU_OBJNAME)/libsprite
 	cd $(GPU_BUILD_PATH); PICO_SDK_PATH=pico-sdk PICO_EXTRAS_PATH=pico-extras cmake -DPICO_COPY_TO_RAM=1 ..
 	make -C $(GPU_BUILD_PATH)
 	cp $(GPU_BUILD_PATH)/$@ .

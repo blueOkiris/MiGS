@@ -12,6 +12,7 @@ pico-sdk/
 pico_sdk_import.cmake
 PicoDVI/
 libdvi/
+libsprite/
 common_dvi_pin_configs.h
 cmake-3.*/
 cmake-3.*.sh
