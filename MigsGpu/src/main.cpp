@@ -88,25 +88,7 @@ int main() {
         queue_add_blocking((queue_t *) &g_dvi.q_color_free, &buffPtr);
     }
 
-    SprBuff sprBuff;
-    for(int i = 0; i < 8 * 8 * 2; i += 2) {
-        sprBuff.data[i] = 0b11100000;
-        sprBuff.data[i + 1] = 0b00000111;
-    }
-    g_sprData.push_back(sprBuff);
-    for(int y = 0; y < 3; y++) {
-        for(int x = 0; x < g_frameWidth / 8; x += 3) {
-            g_sprs.push_back(sprite_t {
-                x * 8, y * 8,
-                g_sprData[g_sprData.size() - 1].data,
-                3, false,
-                false, false
-            });
-        }
-    }
-
-    uint8_t drawCmd[128];
-    uint8_t delayCtr = 0; // Only read updates every fractional time
+    uint8_t drawCmd[8];
     while(true) {
         for(int y = 0; y < g_frameHeight; y++) {
             uint16_t *pixBuff = nullptr;
@@ -118,25 +100,71 @@ int main() {
             queue_add_blocking(&g_dvi.q_color_valid, &pixBuff);
         }
 
-        if(delayCtr++ % 40 == 0) {
-            if(i2c_read_blocking(i2c1, g_cpuI2cAddr, drawCmd, 1, false) > 0) {
-                switch(drawCmd[0]) {
-                    // Do nothing
-                    case 0x55:
-                        break;
+        if(i2c_read_blocking(i2c1, g_cpuI2cAddr, drawCmd, 1, true) > 0) {
+            switch(drawCmd[0]) {
+                // Do nothing
+                case 0x55:
+                    break;
 
-                    // Draw text to screen
-                    case 'T': {
-                        
-                    } break;
-
-                    case 'B':
+                // Add sprite data (use sparingly; only at start - frame drops!)
+                case 'D': {
+                    SprBuff newSprData;
+                    printf("Read %d bytes!\n",
                         i2c_read_blocking(
-                            i2c1, g_cpuI2cAddr, drawCmd, 2, false
-                        );
-                        g_bg = (((uint16_t) drawCmd[0]) << 8) + drawCmd[1];
-                        break;
-                }
+                            i2c1, g_cpuI2cAddr, newSprData.data, 128, true
+                        )
+                    );
+                    printf("Received data:\n");
+                    for(int y = 0; y < 8; y++) {
+                        printf("- ");
+                        for(int x = 0; x < 8; x++) {
+                            printf(
+                                "(%x,%x) ",
+                                newSprData.data[(y * 8 + x) * 2],
+                                newSprData.data[(y * 8 + x) * 2 + 1]
+                            );
+                        }
+                        printf("\n");
+                    }
+                    g_sprData.push_back(newSprData);
+                } break;
+
+                // Add a sprite
+                case 'S': {
+                    i2c_read_blocking(
+                        i2c1, g_cpuI2cAddr, drawCmd, 6, true
+                    );
+
+                    uint16_t x = (((uint16_t) drawCmd[0]) << 8) + drawCmd[1];
+                    uint16_t y = (((uint16_t) drawCmd[2]) << 8) + drawCmd[3];
+                    uint16_t img = (((uint16_t) drawCmd[4]) << 8) + drawCmd[5];
+
+                    printf(
+                        "Drawing sprite: %d:%d, %d:%d, %d:%d\n",
+                        drawCmd[0], drawCmd[1],
+                        drawCmd[2], drawCmd[3],
+                        drawCmd[4], drawCmd[5]
+                    );
+
+                    g_sprs.push_back(sprite_t {
+                        x, y,
+                        g_sprData[img].data,
+                        3, false,
+                        false, false
+                    });
+                };
+
+                // Set background
+                case 'B':
+                    printf(
+                        "Setting background: %x:%x\n",
+                        drawCmd[0], drawCmd[1]
+                    );
+                    i2c_read_blocking(
+                        i2c1, g_cpuI2cAddr, drawCmd, 2, true
+                    );
+                    g_bg = (((uint16_t) drawCmd[0]) << 8) + drawCmd[1];
+                    break;
             }
         }
     }

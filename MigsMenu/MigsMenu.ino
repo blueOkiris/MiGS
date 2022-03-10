@@ -7,7 +7,7 @@
  */
 
 #include <Wire.h>
-#include "font.hpp"
+#include "Font.hpp"
 
 const int g_i2cAddr = 0x7C;
 const int g_numDispGames = 10;
@@ -32,11 +32,13 @@ char g_gameList[g_numDispGames][g_fNameLenLimit] = {
 };
 
 // Flags for sending updated data
+int g_fontsLoaded = 0;
+bool g_tempSendA = true;
 bool g_updateListText = false;
 bool g_setBg = true;
 
 // Data to send
-uint8_t g_sendBuff[129];
+uint8_t g_sendBuff[128];
 
 void setup(void) {
     // Set up communication with the programmer/resource getter
@@ -67,17 +69,28 @@ void requestEvent() {
         Wire.write((uint8_t) ((g_bg >> 8) & 0xFF));
         Wire.write((uint8_t) (g_bg & 0xFF));
         g_setBg = false;
-    } else if(g_updateListText) {
-        for(int i = 0; i < g_numDispGames; i++) {
-            Wire.write('T');
-            Wire.write((uint8_t) ((g_textXOffset >> 8) & 0xFF));
-            Wire.write((uint8_t) (g_textXOffset & 0xFF));
-            Wire.write(g_textYOffset + i * g_textYSpacing);
-            for(int j = 0; j < g_fNameLenLimit; j++) {
-                Wire.write(g_gameList[j]);
-            }
+    } else if(g_fontsLoaded < 2) {
+        Wire.write('D');
+        for(int i = 0; i < 128; i++) {
+            g_sendBuff[i] = pgm_read_byte_near(
+                font::g_fontSprs[g_fontsLoaded] + i
+            );
         }
-        g_updateListText = false;
+        Wire.write(g_sendBuff, 128);
+        g_fontsLoaded++;
+    } else if (g_tempSendA) {
+        Wire.write('S');
+
+        Wire.write(0);
+        Wire.write(13);
+
+        Wire.write(0);
+        Wire.write(27);
+
+        Wire.write(0);
+        Wire.write(FONT_CAP_START);
+
+        g_tempSendA = false;
     } else {
         Wire.write(0x55); // Send "0x55" to the GPU to indicate "do nothing"
     }
